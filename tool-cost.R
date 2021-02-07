@@ -8,6 +8,9 @@ library(scales)
 library(ggtext)
 library(shadowtext)
 
+# Added for fonts to be able to work on Maia's device
+# extrafont::loadfonts(device = "win")
+
 # Generate Data -----------------------------------------------------------
 
 data_tools_cost <- tribble(~tool, ~year_1) %>% 
@@ -59,19 +62,34 @@ data_tools_cost <- tribble(~tool, ~year_1) %>%
   group_by(tool) %>% 
   mutate(total_cost = cumsum(cost)) %>% 
   ungroup() %>% 
-  mutate(year = parse_number(year))
+  mutate(
+    year = parse_number(year),
+    labels_cost = ifelse(year == 5, dollar(total_cost), ""),
+    labels_tool = ifelse(year == 5, tool, ""),
+    tool_id = sort(rep(1:4, 5))
+    )
 
 
 # Make + Save Plot --------------------------------------------------------
 
-data_tools_cost_animation <- data_tools_cost %>% 
+# Animation using transition_states() -------------------------------------
+
+data_tools_cost_plot1 <- 
+  data_tools_cost %>% 
   ggplot(aes(year, total_cost,
-             group = tool,
+             group = tool_id,
              color = tool,
-             label = dollar(total_cost))) +
-  geom_shadowtext(bg.color = "white",
+             label = labels_cost)) +
+  geom_line(size = 1) +
+  geom_point(size = 5) +
+  geom_shadowtext(aes(label = labels_tool, x = 5.25), 
+                  bg.color = "white",
                   family = "Inter SemiBold",
-                  size = 6) +
+                  size = 5) +
+  geom_shadowtext(aes(x = 5.5),
+                  bg.color = "white",
+                  family = "Inter SemiBold",
+                  size = 5) +
   coord_cartesian(clip = "off") +
   scale_color_manual(guide = guide_legend(reverse = TRUE),
                      values = c(
@@ -80,27 +98,96 @@ data_tools_cost_animation <- data_tools_cost %>%
                        "Stata" = "#ec3325",
                        "SPSS" = "#ffc659"
                      )) +
-  scale_y_continuous(labels = dollar_format()) +
-  scale_x_continuous(labels = c("Year 1", "2", "3", "4", "5")) +
+  labs(title = "Cost over time of <b><span style='color: #6cabdd'>R</span></b> compared to 
+       <b><span style='color: #ff7400'>SAS</span></b>,
+       <b><span style='color: #ffc659'>SPSS</span></b>, and
+       <b><span style='color: #ec3325'>Stata</span></b>") +
+  scale_y_continuous(labels = dollar_format(), limits = c(0, 23000)) +
+  scale_x_continuous(labels = c("Year 1", "2", "3", "4", "5"), breaks = 1:5) +
   theme_ipsum(base_family = "Inter",
               base_size = 13) +
   theme(axis.title.x = element_blank(),
         axis.title.y = element_blank(),
         panel.grid.minor.x = element_blank(),
         panel.grid.minor.y = element_blank(),
-        plot.title = element_markdown(),
-        legend.position = "none") +
-  transition_states(year,
-                    transition_length = 2,
-                    state_length = 1) +
-  enter_fade() +
-  exit_shrink() +
+        panel.grid.major.x = element_blank(),
+        plot.title = element_markdown(hjust = 0.5, margin = margin(b = 40)),
+        legend.position = "none")
+
+# Add transition elements
+data_tools_cost_animation1 <-
+  data_tools_cost_plot1 +
+    transition_states(
+      factor(tool, levels = c("R", "Stata", "SPSS", "SAS"))
+    ) +
+  shadow_mark()
+
+#animate(data_tools_cost_animation1, nframes = 50)
+
+# Create gif
+anim_save(data_tools_cost_animation1,
+          filename = "cost-over-time1.gif",
+          width = 1000,
+          height = 500,
+          nframes = 50,
+          type = "cairo")
+
+
+# Animation using transition_reveal() -------------------------------------
+
+# Create static plot
+data_tools_cost_plot2 <- 
+  data_tools_cost %>% 
+  ggplot(aes(year, total_cost,
+             group = tool_id,
+             color = tool,
+             label = labels_cost)) +
+  geom_line(size = 1) +
+  geom_shadowtext(aes(label = tool), 
+                  bg.color = "white",
+                  family = "Inter SemiBold",
+                  size = 5) +
+  geom_shadowtext(aes(x = 5.5),
+                  bg.color = "white",
+                  family = "Inter SemiBold",
+                  size = 5) +
+  coord_cartesian(clip = "off") +
+  scale_color_manual(guide = guide_legend(reverse = TRUE),
+                     values = c(
+                       "R" = "#6cabdd",
+                       "SAS" = "#ff7400",
+                       "Stata" = "#ec3325",
+                       "SPSS" = "#ffc659"
+                     )) +
   labs(title = "Cost over time of <b><span style='color: #6cabdd'>R</span></b> compared to 
        <b><span style='color: #ff7400'>SAS</span></b>,
        <b><span style='color: #ffc659'>SPSS</span></b>, and
-       <b><span style='color: #ec3325'>Stata</span></b>")
+       <b><span style='color: #ec3325'>Stata</span></b>") +
+  scale_y_continuous(labels = dollar_format(), limits = c(0, 23000)) +
+  scale_x_continuous(labels = c("Year 1", "2", "3", "4", "5"), breaks = 1:5) +
+  theme_ipsum(base_family = "Inter",
+              base_size = 13) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title = element_markdown(hjust = 0.5, margin = margin(b = 40)),
+        legend.position = "none")
 
-anim_save(data_tools_cost_animation,
-          filename = "cost-over-time.gif",
+# Add transition elements
+data_tools_cost_animation2 <-
+  data_tools_cost_plot2 +
+  transition_reveal(
+    year, keep_last = TRUE
+  ) +
+  view_follow()
+
+#animate(data_tools_cost_animation2, nframes = 50)
+
+# Create gif
+anim_save(data_tools_cost_animation2,
+          filename = "cost-over-time2.gif",
           width = 1000,
-          height = 500)
+          height = 500, 
+          type = "cairo")
